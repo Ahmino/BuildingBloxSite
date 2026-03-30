@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmd //c \"nvm list\")",
+      "Bash(cmd //c \"nvm version\")",
+      "Read(//c/Program Files/**)",
+      "Bash(cmd //c \"winget --version\")"
+    ]
+  }
+}
