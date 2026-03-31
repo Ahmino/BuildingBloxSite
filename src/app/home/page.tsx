@@ -1,17 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { PageShell } from "@/components/layout";
 import { Card, StatCard } from "@/components/ui";
-import { defaultGames } from "@/data/games";
+import { useGames } from "@/context/GamesContext";
 import { compactNumber } from "@/lib/format";
-
-const stats = [
-  { label: "Total CCU", value: "113K+", description: "Concurrent users across all games" },
-  { label: "Monthly Active Users", value: "7.1M+", description: "Players every month" },
-  { label: "Games Live", value: "4", description: "Active titles on Roblox" },
-  { label: "Team Members", value: "30+", description: "Developers, artists & creators" },
-];
 
 const collaborations = [
   { brand: "Nike", description: "In-game branded experience and virtual merchandise collection" },
@@ -23,7 +17,13 @@ const collaborations = [
 ];
 
 export default function HomePage() {
-  const liveGames = defaultGames.filter((g) => g.status === "live");
+  const { games, loading } = useGames();
+
+  const totalPlaying = games.reduce((sum, g) => sum + g.playing, 0);
+  const totalVisits = games.reduce((sum, g) => sum + g.visits, 0);
+
+  // Top 4 by current players (already sorted from context)
+  const featured = games.slice(0, 4);
 
   return (
     <PageShell>
@@ -32,8 +32,8 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-gradient-to-b from-brand-950/20 to-transparent" />
         <div className="relative mx-auto max-w-7xl px-6 text-center">
           <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-brand-800/40 bg-brand-950/50 px-4 py-1.5 text-sm text-brand-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
-            113K+ players online now
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400" />
+            {loading ? "Loading live data..." : `${compactNumber(totalPlaying)} players online now`}
           </div>
           <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
             We Build Worlds
@@ -60,9 +60,10 @@ export default function HomePage() {
       <section className="border-b border-gray-800 py-16">
         <div className="mx-auto max-w-7xl px-6">
           <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
-            {stats.map((s) => (
-              <StatCard key={s.label} label={s.label} value={s.value} description={s.description} valueClassName="text-brand-400" />
-            ))}
+            <StatCard label="Live Players" value={loading ? "..." : compactNumber(totalPlaying)} description="Playing right now across all games" valueClassName="text-green-400" />
+            <StatCard label="Total Visits" value={loading ? "..." : compactNumber(totalVisits)} description="All-time plays" valueClassName="text-blue-400" />
+            <StatCard label="Games" value={loading ? "..." : String(games.length)} description="Titles in the portfolio" valueClassName="text-brand-400" />
+            <StatCard label="Team Members" value="30+" description="Developers, artists & creators" valueClassName="text-brand-400" />
           </div>
         </div>
       </section>
@@ -73,25 +74,52 @@ export default function HomePage() {
           <div className="mb-8 flex items-end justify-between">
             <div>
               <h2 className="text-2xl font-bold">Featured Games</h2>
-              <p className="mt-1 text-gray-400">Our top-performing live titles</p>
+              <p className="mt-1 text-gray-400">Our top-performing titles right now</p>
             </div>
             <Link href="/games" className="text-sm font-medium text-brand-400 hover:text-brand-300">
               View all &rarr;
             </Link>
           </div>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {liveGames.map((game) => (
-              <Card key={game.id} className="transition-colors hover:border-gray-700">
-                <div className="mb-3 text-3xl">{game.icon}</div>
-                <h3 className="font-semibold">{game.title}</h3>
-                <p className="mt-1 text-xs text-gray-500">{game.genre}</p>
-                <div className="mt-3 flex gap-4 text-xs">
-                  <span className="text-green-400">{compactNumber(game.ccu)} CCU</span>
-                  <span className="text-blue-400">{compactNumber(game.mau)} MAU</span>
+
+          {loading ? (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="animate-pulse rounded-xl border border-gray-800 bg-gray-900/60 p-5">
+                  <div className="mb-3 h-12 w-12 rounded-lg bg-gray-800" />
+                  <div className="h-4 w-3/4 rounded bg-gray-800" />
+                  <div className="mt-2 h-3 w-1/2 rounded bg-gray-800" />
+                  <div className="mt-3 h-3 w-2/3 rounded bg-gray-800" />
                 </div>
-              </Card>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {featured.map((game) => (
+                <a
+                  key={game.universeId}
+                  href={game.gameUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group rounded-xl border border-gray-800 bg-gray-900/60 p-5 backdrop-blur-sm transition-all hover:border-brand-600/50 hover:-translate-y-1"
+                >
+                  <div className="mb-3 relative h-12 w-12 overflow-hidden rounded-lg bg-gray-800">
+                    {game.thumbnailUrl && (
+                      <Image src={game.thumbnailUrl} alt={game.name} fill sizes="48px" className="object-cover" />
+                    )}
+                  </div>
+                  <h3 className="font-semibold truncate group-hover:text-brand-400 transition-colors">{game.name}</h3>
+                  <p className="mt-1 text-xs text-gray-500">{game.genre}</p>
+                  <div className="mt-3 flex gap-4 text-xs">
+                    <span className="flex items-center gap-1 text-green-400">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400" />
+                      {compactNumber(game.playing)} CCU
+                    </span>
+                    <span className="text-blue-400">{compactNumber(game.visits)} visits</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

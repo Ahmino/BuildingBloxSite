@@ -1,16 +1,17 @@
 "use client";
 
 import { useData } from "@/context/DataContext";
+import { useGames } from "@/context/GamesContext";
 import { PageHeader } from "@/components/layout";
 import { Card, StatCard } from "@/components/ui";
 import { compactNumber, formatCurrency, formatSignedCurrency } from "@/lib/format";
 
 export default function DashboardPage() {
-  const { games, finances } = useData();
+  const { finances } = useData();
+  const { games, loading } = useGames();
 
-  const liveCount = games.filter((g) => g.status === "live").length;
-  const totalCCU = games.reduce((sum, g) => sum + g.ccu, 0);
-  const totalMAU = games.reduce((sum, g) => sum + g.mau, 0);
+  const totalPlaying = games.reduce((sum, g) => sum + g.playing, 0);
+  const totalVisits = games.reduce((sum, g) => sum + g.visits, 0);
   const totalRevenue = finances.reduce((sum, f) => sum + f.revenue, 0);
   const totalExpenses = finances.reduce((sum, f) => sum + f.expenses, 0);
   const totalProfit = totalRevenue - totalExpenses;
@@ -22,9 +23,23 @@ export default function DashboardPage() {
 
       {/* Top Stats */}
       <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Total Games" value={String(games.length)} description={`${liveCount} live`} />
-        <StatCard label="Total CCU" value={compactNumber(totalCCU)} description="across all games" valueClassName="text-green-400" />
-        <StatCard label="Total MAU" value={compactNumber(totalMAU)} description="monthly active users" valueClassName="text-blue-400" />
+        <StatCard
+          label="Total Games"
+          value={loading ? "..." : String(games.length)}
+          description="in the portfolio"
+        />
+        <StatCard
+          label="Live Players"
+          value={loading ? "..." : compactNumber(totalPlaying)}
+          description="playing right now"
+          valueClassName="text-green-400"
+        />
+        <StatCard
+          label="Total Visits"
+          value={loading ? "..." : compactNumber(totalVisits)}
+          description="all-time across all games"
+          valueClassName="text-blue-400"
+        />
         <StatCard
           label="Total Profit (YTD)"
           value={`${totalProfit >= 0 ? "+" : ""}${formatCurrency(totalProfit)}`}
