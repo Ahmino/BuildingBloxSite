@@ -6,37 +6,98 @@ import {
   useState,
   useCallback,
   useEffect,
+  useRef,
   ReactNode,
 } from "react";
 import type { RobloxGame } from "@/lib/roblox";
-import { GAME_CONFIGS } from "@/lib/roblox";
 
 interface GamesContextType {
-  /** Live game data sorted by CCU, refreshes automatically. */
   games: RobloxGame[];
-  /** The managed list of place IDs (source of truth for which games to show). */
   placeIds: string[];
   loading: boolean;
   error: string | null;
-  /** Add a game by pasting a Roblox URL. Returns the resolved game or an error string. */
   addGameByUrl: (url: string) => Promise<{ game?: RobloxGame; error?: string }>;
-  /** Remove a game by its place ID. */
   removeGame: (placeId: string) => void;
-  /** Force refresh live data. */
   refetch: () => void;
 }
 
 const GamesContext = createContext<GamesContextType | null>(null);
 
-const DEFAULT_PLACE_IDS = GAME_CONFIGS.map((c) => c.placeId);
+const LS_KEY = "buildingblox_place_ids";
+
+/** Read place IDs from localStorage (instant, browser-only). */
+function readLocalStorage(): string[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Write place IDs to localStorage. */
+function writeLocalStorage(ids: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(ids));
+  } catch { /* quota exceeded — ignore */ }
+}
+
+/** Persist place IDs to the server JSON file. */
+async function persistToServer(ids: string[]) {
+  try {
+    await fetch("/api/games/list", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ placeIds: ids }),
+    });
+  } catch {
+    // Silent fail — localStorage is the primary fallback
+  }
+}
+
+/** Load the initial place ID list: localStorage first, then server file. */
+async function loadInitialPlaceIds(): Promise<string[]> {
+  // 1. Try localStorage (instant)
+  const local = readLocalStorage();
+  if (local && local.length > 0) return local;
+
+  // 2. Fall back to server JSON file
+  try {
+    const res = await fetch("/api/games/list");
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.placeIds) && data.placeIds.length > 0) {
+        writeLocalStorage(data.placeIds);
+        return data.placeIds;
+      }
+    }
+  } catch { /* ignore */ }
+
+  return [];
+}
 
 export function GamesProvider({ children }: { children: ReactNode }) {
-  const [placeIds, setPlaceIds] = useState<string[]>(DEFAULT_PLACE_IDS);
+  const [placeIds, setPlaceIds] = useState<string[]>([]);
   const [games, setGames] = useState<RobloxGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const initialized = useRef(false);
 
-  /* ── Fetch live data for all current placeIds ─────────── */
+  /* ── Load saved place IDs on mount ────────────────────── */
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+
+    loadInitialPlaceIds().then((ids) => {
+      setPlaceIds(ids);
+    });
+  }, []);
+
+  /* ── Fetch live game data whenever placeIds change ────── */
   const fetchGames = useCallback(async () => {
     if (placeIds.length === 0) {
       setGames([]);
@@ -62,10 +123,25 @@ export function GamesProvider({ children }: { children: ReactNode }) {
   }, [placeIds]);
 
   useEffect(() => {
+    if (!initialized.current) return;
     fetchGames();
     const interval = setInterval(fetchGames, 60_000);
     return () => clearInterval(interval);
   }, [fetchGames]);
+
+  /* ── Persist whenever placeIds change ─────────────────── */
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    // Skip the initial empty render
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    if (placeIds.length === 0) return;
+
+    writeLocalStorage(placeIds);
+    persistToServer(placeIds);
+  }, [placeIds]);
 
   /* ── Add game by URL ──────────────────────────────────── */
   const addGameByUrl = useCallback(
@@ -85,12 +161,12 @@ export function GamesProvider({ children }: { children: ReactNode }) {
 
         const game: RobloxGame = data.game;
 
-        // Prevent duplicates
         if (placeIds.includes(game.placeId)) {
           return { error: "This game is already in the list." };
         }
 
-        setPlaceIds((prev) => [...prev, game.placeId]);
+        const newIds = [...placeIds, game.placeId];
+        setPlaceIds(newIds);
         setGames((prev) =>
           [...prev, game].sort((a, b) => b.playing - a.playing),
         );
@@ -104,10 +180,18 @@ export function GamesProvider({ children }: { children: ReactNode }) {
   );
 
   /* ── Remove game ──────────────────────────────────────── */
-  const removeGame = useCallback((placeId: string) => {
-    setPlaceIds((prev) => prev.filter((id) => id !== placeId));
-    setGames((prev) => prev.filter((g) => g.placeId !== placeId));
-  }, []);
+  const removeGame = useCallback(
+    (placeId: string) => {
+      const newIds = placeIds.filter((id) => id !== placeId);
+      setPlaceIds(newIds);
+      setGames((prev) => prev.filter((g) => g.placeId !== placeId));
+
+      // Persist immediately
+      writeLocalStorage(newIds);
+      persistToServer(newIds);
+    },
+    [placeIds],
+  );
 
   return (
     <GamesContext.Provider

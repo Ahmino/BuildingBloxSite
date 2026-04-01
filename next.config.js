@@ -4,7 +4,7 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "tr.rbxcdn.com",
+        hostname: "*.rbxcdn.com",
       },
     ],
   },
