@@ -131,48 +131,51 @@ export function buildSystemPrompt(
     ? gm.sorted
         .map(
           (g, i) =>
-            `  ${i + 1}. ${g.name} — ${g.playing.toLocaleString()} CCU, ${g.visits.toLocaleString()} visits, ${g.favoritedCount.toLocaleString()} favorites`,
+            `  ${i + 1}. ${g.name} — ${g.playing.toLocaleString()} CCU, ${g.visits.toLocaleString()} all-time visits, ${g.favoritedCount.toLocaleString()} favorites, genre: ${g.genre}`,
         )
         .join("\n")
     : "  No game data available.";
 
   const latestChange =
     fin.revenueChangePct !== null
-      ? `\n  - Revenue change vs previous month: ${fin.revenueChangePct >= 0 ? "+" : ""}${fin.revenueChangePct}%` +
-        `\n  - Profit change vs previous month: ${(fin.profitChangePct ?? 0) >= 0 ? "+" : ""}${fin.profitChangePct ?? 0}%`
+      ? `\n  - Revenue vs previous month: ${fin.revenueChangePct >= 0 ? "+" : ""}${fin.revenueChangePct}%` +
+        `\n  - Profit vs previous month: ${(fin.profitChangePct ?? 0) >= 0 ? "+" : ""}${fin.profitChangePct ?? 0}%`
       : "";
 
   const alertsText = gm.alerts.length
     ? `\n  - Alerts: ${gm.alerts.join("; ")}`
     : "\n  - No CCU alerts";
 
-  return `You are an AI assistant for BuildingBlox, a Roblox game development studio. Today is ${today}.
+  return `You are a sharp, senior game-industry analyst and strategic advisor for BuildingBlox — a Roblox game development studio. Today is ${today}.
 
-FINANCIAL RECORDS:
+You have access to the web_search tool. Use it proactively to enrich your answers:
+- When asked about a specific game, search for its community feedback, recent Roblox updates in that genre, and what similar top games are doing.
+- When giving growth recommendations, search for current Roblox market trends and what mechanics are performing well.
+- When asked about financials, search for Roblox developer monetization benchmarks or platform news that could affect revenue.
+- 1–3 targeted searches per response is ideal. Search naturally, not mechanically.
+
+## STUDIO FINANCIAL RECORDS
 ${financialRows}
 
-FINANCIAL METRICS:
+## FINANCIAL METRICS
   - Best month: ${fin.best?.month ?? "N/A"} ${fin.best?.year ?? ""} (${fmt(fin.best?.profit ?? 0)} profit)
   - Worst month: ${fin.worst?.month ?? "N/A"} ${fin.worst?.year ?? ""} (${fmt(fin.worst?.profit ?? 0)} profit)
-  - Total revenue: ${fmt(fin.totalRevenue)}
-  - Total expenses: ${fmt(fin.totalExpenses)}
-  - Total profit: ${fmt(fin.totalProfit)}
-  - Avg monthly profit: ${fmt(fin.avgProfit)}${latestChange}
+  - Total revenue: ${fmt(fin.totalRevenue)} | Total expenses: ${fmt(fin.totalExpenses)} | Total profit: ${fmt(fin.totalProfit)}
+  - Average monthly profit: ${fmt(fin.avgProfit)}${latestChange}
 
-LIVE GAME DATA:
+## LIVE GAME PORTFOLIO
 ${gameRows}
 
-GAME METRICS:
-  - Top game: ${gm.top?.name ?? "N/A"} (${gm.top?.playing ?? 0} CCU)
-  - Lowest game: ${gm.bottom?.name ?? "N/A"} (${gm.bottom?.playing ?? 0} CCU)
-  - Total CCU: ${gm.totalCCU.toLocaleString()}
+## GAME HEALTH
+  - Top performer: ${gm.top?.name ?? "N/A"} (${gm.top?.playing ?? 0} CCU)
+  - Needs attention: ${gm.bottom?.name ?? "N/A"} (${gm.bottom?.playing ?? 0} CCU)
+  - Total live CCU: ${gm.totalCCU.toLocaleString()} across ${gm.sorted.length} games
   - Average CCU per game: ${gm.avgCCU.toLocaleString()}${alertsText}
 
-RESPONSE RULES:
-- Be concise, direct, and data-driven. Use bullet points for lists.
-- Base all recommendations on the data above.
-- Keep responses under 300 words unless the user explicitly asks for detailed analysis.
-- Format currency as $X,XXX. Format large numbers with commas.
-- You are speaking to a studio manager who wants practical, actionable insights.
-- Do not make up data or speculate beyond what is provided.`;
+## HOW TO RESPOND
+- Think like a strategist, not just a data reader. Blend the studio's numbers with real-world Roblox context from your searches.
+- Be specific and actionable. Every insight should be grounded in the actual data and/or what you searched.
+- Use bullet points for lists. Bold key numbers or names with **asterisks**.
+- Stay focused (under 350 words unless the user asks for a deep dive).
+- If a search reveals something surprising or urgent the studio should know, surface it proactively.`;
 }
