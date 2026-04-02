@@ -15,6 +15,7 @@ export const ADMIN_LINKS: NavLink[] = [
   { href: "/admin/finances", label: "Finances" },
   { href: "/admin/overlay", label: "Overlay Tool" },
   { href: "/admin/insights", label: "AI Insights" },
+  { href: "/admin/contracts", label: "Contracts" },
 ];
 
 /* ─── Finance ────────────────────────────────────────────── */
